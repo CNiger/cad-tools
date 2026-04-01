@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: cad-tools
+    runtime: python
+    repo: https://github.com/ВАШ_АККАУНТ/cad-tools
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0

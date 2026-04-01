@@ -1,6 +1,10 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+
 cadquery==2.3.0
+cadquery-ocp==7.7.2
+OCP==7.7.2
+
 ezdxf==1.1.0
 python-multipart==0.0.6
 numpy==1.23.5

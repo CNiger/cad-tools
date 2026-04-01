@@ -1,6 +1,6 @@
 FROM python:3.9-slim
 
-# Устанавливаем системные зависимости для OCCT и pythonocc-core
+# Системные зависимости для CadQuery / OCP
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libgl1 \
@@ -30,16 +30,18 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Устанавливаем pip и зависимости
+# Установка Python зависимостей
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Копируем проект
 COPY . .
 
-# Создаём необходимые директории
+# Создаём нужные директории
 RUN mkdir -p temp primitives static
 
 EXPOSE 8000
 
-CMD ["python", "app.py"]
+# ВАЖНО: для Render / продакшена лучше uvicorn
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

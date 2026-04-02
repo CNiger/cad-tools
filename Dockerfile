@@ -1,47 +1,27 @@
-FROM python:3.9-slim
+FROM continuumio/miniconda3
 
-# Системные зависимости для CadQuery / OCP
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglu1-mesa \
-    libx11-6 \
-    libxext6 \
-    libxrender1 \
-    libxcb1 \
-    libxcb-icccm4 \
-    libxcb-image0 \
-    libxcb-keysyms1 \
-    libxcb-randr0 \
-    libxcb-render-util0 \
-    libxcb-shape0 \
-    libxcb-xfixes0 \
-    libxcb-xinerama0 \
-    libxcb-xkb1 \
-    libxkbcommon-x11-0 \
-    libxkbcommon0 \
-    libfreetype6 \
-    libfontconfig1 \
-    libglib2.0-0 \
-    libsm6 \
-    libice6 \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
+# Создаём окружение со всеми зависимостями
+RUN conda create -n cadenv -c conda-forge \
+    python=3.9 \
+    cadquery=2.3 \
+    fastapi \
+    uvicorn \
+    ezdxf \
+    -y
+
+# Активируем окружение для всех последующих RUN / CMD
+SHELL ["conda", "run", "-n", "cadenv", "/bin/bash", "-c"]
 
 WORKDIR /app
 
-# Установка Python зависимостей
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Копируем проект
 COPY . .
 
-# Создаём нужные директории
-RUN mkdir -p temp primitives static
+# (опционально) если нужен python-multipart
+RUN pip install python-multipart
 
 EXPOSE 8000
 
-# ВАЖНО: для Render / продакшена лучше uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# ВАЖНО: замените app:cut_app на правильную точку входа
+# Если ваш главный app лежит в main.py и называется app → main:app
+# Если у вас app.py и внутри from main import app as cut_app → app:cut_app
+CMD ["conda", "run", "-n", "cadenv", "uvicorn", "app:cut_app", "--host", "0.0.0.0", "--port", "8000"]

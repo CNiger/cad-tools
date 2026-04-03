@@ -26,4 +26,4 @@ ENV OSMESA_LIBRARY=/usr/lib/x86_64-linux-gnu/libOSMesa.so.6
 
 EXPOSE 8000
 
-CMD ["conda", "run", "-n", "cadenv", "uvicorn", "app:cut_app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["conda", "run", "-n", "cadenv", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

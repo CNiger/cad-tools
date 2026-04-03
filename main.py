@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, validator
+from OCP.TopoDS import TopoDS_Shape
+
 
 # Импорты для HLR
 try:

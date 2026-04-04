@@ -1,3 +1,10 @@
+"""
+Engineering CAD Cut Service
+Полная версия с HLR через pythonOCC (с fallback на SVG).
+Всегда генерирует SVG для трёх видов.
+Размеры: сфера R30, цилиндр/конус R30 x H70.
+"""
+
 import uuid
 import traceback
 from pathlib import Path
@@ -11,7 +18,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, validator
-from OCP.TopoDS import TopoDS_Shape
 
 # Импорты для HLR
 try:
@@ -444,4 +450,3 @@ if __name__ == "__main__":
     print("Engineering CAD Cut Service v3.2 (SVG always, DXF optional)")
     print("="*60)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
-

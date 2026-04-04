@@ -1,28 +1,17 @@
 """
-Unified Router for CAD Tools
+CAD Tools Suite — маршрутизатор с проксированием на CAD Cut Service.
 """
 
-import os
-from pathlib import Path
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
-import uvicorn
-
-# Импортируем CAD Cut Service
-from main import app as cut_app
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import HTMLResponse, FileResponse
+import httpx
 
 app = FastAPI(title="CAD Tools Suite")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# URL сервиса вырезания (запускается на порту 8001 внутри контейнера)
+CUT_SERVICE_URL = "http://localhost:8001"
 
-# Главная страница
+# Главная страница — только работающие инструменты
 HTML_INDEX = '''<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -85,11 +74,6 @@ HTML_INDEX = '''<!DOCTYPE html>
                 <div class="tool-title">CAD Cut Service</div>
                 <div class="tool-desc">Профилирование деталей с вырезом. STEP, STL, SVG, DXF.</div>
             </a>
-            <a href="/ortho" class="tool-card">
-                <div class="tool-icon">📐</div>
-                <div class="tool-title">Ortho Mode</div>
-                <div class="tool-desc">Ортогональное рисование контуров. Горизонталь/вертикаль.</div>
-            </a>
             <a href="/epure" class="tool-card">
                 <div class="tool-icon">📏</div>
                 <div class="tool-title">Эпюр Монжа</div>
@@ -106,24 +90,32 @@ HTML_INDEX = '''<!DOCTYPE html>
 async def root():
     return HTML_INDEX
 
-@app.get("/ortho", response_class=HTMLResponse)
-async def ortho_mode():
-    path = Path(__file__).parent / "index.html"
-    if path.exists():
-        return FileResponse(path)
-    raise HTTPException(404, "Not found")
-
 @app.get("/epure", response_class=HTMLResponse)
 async def epure_mode():
-    path = Path(__file__).parent / "alp.html"
-    if path.exists():
-        return FileResponse(path)
-    raise HTTPException(404, "Not found")
+    """Отдаёт фронтенд эпюра Монжа"""
+    return FileResponse("alp.html")
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "services": ["cut", "ortho", "epure"]}
+# Проксирование всех запросов /cut/* на внутренний сервис
+@app.api_route("/cut/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def cut_proxy(request: Request, path: str):
+    async with httpx.AsyncClient() as client:
+        url = f"{CUT_SERVICE_URL}/{path}"
+        body = await request.body()
+        # Проксируем заголовки, исключая host
+        headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+        resp = await client.request(
+            method=request.method,
+            url=url,
+            headers=headers,
+            content=body,
+            params=request.query_params
+        )
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers=dict(resp.headers)
+        )
 
-# Монтируем CAD Cut Service
-app.mount("/cut", cut_app)
-
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

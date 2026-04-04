@@ -14,6 +14,7 @@ RUN conda create -n cadenv -c conda-forge \
     ezdxf \
     -y
 
+
 SHELL ["conda", "run", "-n", "cadenv", "/bin/bash", "-c"]
 
 WORKDIR /app

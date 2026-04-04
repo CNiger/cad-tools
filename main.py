@@ -315,6 +315,9 @@ def make_3view_drawing_hlr(occ_shape: TopoDS_Shape, base_name: str) -> Path:
 async def create_model(req: CutRequest):
     try:
         print(f"\n🔧 Processing {req.shape} with {len(req.points)} points")
+        import sys
+        print("=== CREATE MODEL CALLED ===", file=sys.stderr)
+        print(f"Shape: {req.shape}, Points: {req.points}", file=sys.stderr)
 
         base = load_primitive(req.shape)
         base = align_primitive(base, req.shape)

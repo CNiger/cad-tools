@@ -1,7 +1,7 @@
 """
 Engineering CAD Cut Service
-Полная версия с HLR через pythonOCC (с fallback на SVG).
-Всегда генерирует SVG для трёх видов.
+Полная версия с HLR через pythonOCC (без fallback).
+Генерирует STEP, STL, SVG и DXF (чертёж с видимыми/невидимыми линиями).
 Размеры: сфера R30, цилиндр/конус R30 x H70.
 """
 
@@ -16,26 +16,19 @@ from ezdxf.math import Vec2
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, validator
 
-# Импорты для HLR
-try:
-    from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-    from OCC.Core.HLRAlgo import HLRAlgo_Projector
-    from OCC.Core.TopoDS import TopoDS_Shape 
-    from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax1, gp_Trsf
-    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
-    from OCC.Core.TopExp import TopExp_Explorer
-    from OCC.Core.TopAbs import TopAbs_EDGE
-    from OCC.Core.BRep import BRep_Tool
-    from OCC.Core.GCPnts import GCPnts_AbscissaPoint
-    from OCC.Core.GeomAdaptor import GeomAdaptor_Curve
-    from OCC.Core.Geom import Geom_Curve
-    OCC_AVAILABLE = True
-except ImportError:
-    OCC_AVAILABLE = False
-    print("WARNING: pythonOCC not installed. HLR will use SVG fallback.")
+# Обязательные импорты pythonOCC (без fallback)
+from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+from OCC.Core.HLRAlgo import HLRAlgo_Projector
+from OCC.Core.TopoDS import TopoDS_Shape
+from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax1, gp_Trsf
+from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+from OCC.Core.TopExp import TopExp_Explorer
+from OCC.Core.TopAbs import TopAbs_EDGE
+from OCC.Core.BRep import BRep_Tool
+from OCC.Core.GCPnts import GCPnts_AbscissaPoint
+from OCC.Core.GeomAdaptor import GeomAdaptor_Curve
 
 # -----------------------------------------------------------------------------
 # Конфигурация
@@ -51,8 +44,7 @@ STATIC_DIR.mkdir(exist_ok=True)
 REQUIRED_PRIMITIVES = ["sphere.step", "cylinder.step", "cone.step"]
 missing = [f for f in REQUIRED_PRIMITIVES if not (PRIMITIVES_DIR / f).exists()]
 if missing:
-    print("ERROR: Missing primitive files:", missing)
-    exit(1)
+    raise RuntimeError(f"Missing primitive STEP files: {missing}")
 
 SUPPORTED_SHAPES = {"sphere", "cylinder", "cone"}
 CUTTER_DEPTH = 200.0
@@ -75,7 +67,7 @@ app.add_middleware(
 )
 
 # -----------------------------------------------------------------------------
-# Модель запроса
+# Pydantic модель
 # -----------------------------------------------------------------------------
 class CutRequest(BaseModel):
     shape: str
@@ -179,15 +171,14 @@ def perform_cut(shape: cq.Workplane, cutter: cq.Workplane) -> cq.Workplane:
 # SVG генерация (всегда)
 # -----------------------------------------------------------------------------
 def make_3view_svg(shape: cq.Workplane, base_name: str) -> dict:
-    # Настройки экспорта
     svg_opts = {
         "width": 400,
         "height": 400,
         "marginLeft": 20,
         "marginTop": 20,
         "strokeWidth": 0.5,
-        "strokeColor": (255, 140, 0),          # оранжевый
-        "hiddenColor": (173, 216, 230),        # пастельно-синий
+        "strokeColor": (255, 140, 0),
+        "hiddenColor": (173, 216, 230),
         "showHidden": True,
         "showAxes": False
     }
@@ -202,7 +193,7 @@ def make_3view_svg(shape: cq.Workplane, base_name: str) -> dict:
     return views
 
 # -----------------------------------------------------------------------------
-# HLR через pythonOCC (исправленный)
+# HLR через pythonOCC (обязателен)
 # -----------------------------------------------------------------------------
 def get_occ_shape(cq_shape: cq.Workplane) -> TopoDS_Shape:
     return cq_shape.val().wrapped
@@ -304,7 +295,7 @@ def make_3view_drawing_hlr(occ_shape: TopoDS_Shape, base_name: str) -> Path:
 # API Endpoints
 # -----------------------------------------------------------------------------
 @app.post("/api/create-model")
-def create_model(req: CutRequest):
+async def create_model(req: CutRequest):
     try:
         print(f"\n🔧 Processing {req.shape} with {len(req.points)} points")
 
@@ -329,17 +320,12 @@ def create_model(req: CutRequest):
         stl_path = TEMP_DIR / f"{base_name}.stl"
         cq.exporters.export(result, str(stl_path), tolerance=0.01, angularTolerance=0.1)
 
-        # SVG (всегда)
+        # SVG
         svg_files = make_3view_svg(result, base_name)
 
-        # DXF (опционально)
-        dxf_path = None
-        if OCC_AVAILABLE:
-            try:
-                occ_shape = get_occ_shape(result)
-                dxf_path = make_3view_drawing_hlr(occ_shape, base_name)
-            except Exception as e:
-                print(f"HLR failed, DXF not generated: {e}")
+        # DXF через HLR (обязателен)
+        occ_shape = get_occ_shape(result)
+        dxf_path = make_3view_drawing_hlr(occ_shape, base_name)
 
         response = {
             "success": True,
@@ -379,16 +365,14 @@ def create_model(req: CutRequest):
                         "url": f"/api/download/svg/{base_name}_left.svg",
                         "size": Path(svg_files["left"]).stat().st_size
                     }
+                },
+                "dxf": {
+                    "filename": f"{base_name}_drawing.dxf",
+                    "url": f"/api/download/dxf/{base_name}_drawing.dxf",
+                    "size": dxf_path.stat().st_size
                 }
             }
         }
-
-        if dxf_path:
-            response["downloads"]["dxf"] = {
-                "filename": f"{base_name}_drawing.dxf",
-                "url": f"/api/download/dxf/{base_name}_drawing.dxf",
-                "size": dxf_path.stat().st_size
-            }
 
         return response
 
@@ -434,19 +418,20 @@ def health():
     return {
         "status": "ok",
         "cadquery": cq.__version__,
-        "pythonocc": OCC_AVAILABLE,
+        "pythonocc": True,  # всегда true, так как импорт обязателен
         "primitives": primitives,
         "temp_files": len(list(TEMP_DIR.glob("*")))
     }
 
 # -----------------------------------------------------------------------------
-# Статика
+# Статика (фронтенд для cut-сервиса, если нужен)
 # -----------------------------------------------------------------------------
+from fastapi.staticfiles import StaticFiles
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
     print("\n" + "="*60)
-    print("Engineering CAD Cut Service v3.2 (SVG always, DXF optional)")
+    print("Engineering CAD Cut Service v3.2 (HLR required)")
     print("="*60)
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=False, log_level="info")

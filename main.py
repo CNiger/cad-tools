@@ -23,7 +23,7 @@ from pydantic import BaseModel, validator
 try:
     from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
     from OCC.Core.HLRAlgo import HLRAlgo_Projector
-    from OCC.Core.TopoDS import TopoDS_Shape
+    from OCC.Core.TopoDS import TopoDS_Shape 
     from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax1, gp_Trsf
     from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
     from OCC.Core.TopExp import TopExp_Explorer

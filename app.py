@@ -8,7 +8,6 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
-from OCC.Core.TopoDS import TopoDS_Shape
 import uvicorn
 
 # Импортируем CAD Cut Service

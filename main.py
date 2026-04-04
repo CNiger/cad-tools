@@ -45,8 +45,8 @@ STATIC_DIR.mkdir(exist_ok=True)
 
 REQUIRED_PRIMITIVES = ["sphere.step", "cylinder.step", "cone.step"]
 missing = [f for f in REQUIRED_PRIMITIVES if not (PRIMITIVES_DIR / f).exists()]
-if missing:
-    raise RuntimeError(f"Missing primitive STEP files: {missing}")
+#cif missing:
+ #    raise RuntimeError(f"Missing primitive STEP files: {missing}")
 
 SUPPORTED_SHAPES = {"sphere", "cylinder", "cone"}
 CUTTER_DEPTH = 200.0

@@ -10,6 +10,8 @@ import traceback
 from pathlib import Path
 from typing import List, Tuple
 
+import os 
+
 import cadquery as cq
 import ezdxf
 from ezdxf.math import Vec2
@@ -54,6 +56,21 @@ PRIMITIVE_CONFIG = {
     "cylinder": {"radius": 30.0, "height": 70.0},
     "cone": {"radius": 30.0, "height": 70.0}
 }
+# Диагностика примитивов
+print("=== DIAGNOSTICS ===")
+print("Current working directory:", os.getcwd())
+print("BASE_DIR:", BASE_DIR)
+PRIMITIVES_DIR = BASE_DIR / "primitives"
+print("PRIMITIVES_DIR:", PRIMITIVES_DIR)
+print("Exists:", PRIMITIVES_DIR.exists())
+if PRIMITIVES_DIR.exists():
+    print("Files in primitives:", list(PRIMITIVES_DIR.glob("*")))
+else:
+    print("Primitives directory NOT found")
+    # Попробуем поискать в других местах
+    for root, dirs, files in os.walk("."):
+        if "primitives" in dirs:
+            print(f"Found primitives at: {os.path.join(root, 'primitives')}")
 
 # -----------------------------------------------------------------------------
 # FastAPI

@@ -20,10 +20,7 @@ COPY . .
 
 RUN pip install httpx
 RUN mkdir -p primitives temp static
-RUN test -f primitives/sphere.step && test -f primitives/cylinder.step && test -f primitives/cone.step || \
-    (echo "ERROR: Primitive STEP files not found in primitives/" && exit 1)
 
 EXPOSE 8000
 
-# Запускаем только app.py (он поднимает cut_app внутри себя)
 CMD ["conda", "run", "-n", "cadenv", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

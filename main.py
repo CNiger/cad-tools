@@ -1,10 +1,3 @@
-"""
-Engineering CAD Cut Service
-Полная версия с HLR через pythonOCC (с fallback на SVG).
-Всегда генерирует SVG для трёх видов.
-Размеры: сфера R30, цилиндр/конус R30 x H70.
-"""
-
 import uuid
 import traceback
 from pathlib import Path
@@ -18,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, validator
+from OCP.TopoDS import TopoDS_Shape
 
 # Импорты для HLR
 try:
@@ -63,9 +57,6 @@ PRIMITIVE_CONFIG = {
     "cone": {"radius": 30.0, "height": 70.0}
 }
 
-# ========== КЭШ ПРИМИТИВОВ ==========
-_PRIMITIVES_CACHE = {}
-
 # -----------------------------------------------------------------------------
 # FastAPI
 # -----------------------------------------------------------------------------
@@ -76,20 +67,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Предзагрузка примитивов при старте сервера
-@app.on_event("startup")
-async def preload_primitives():
-    print("\n" + "="*50)
-    print("Preloading primitives...")
-    for shape in SUPPORTED_SHAPES:
-        try:
-            load_primitive(shape)
-            print(f"  ✓ {shape} loaded and cached")
-        except Exception as e:
-            print(f"  ✗ {shape} failed: {e}")
-    print("Primitives preloading complete")
-    print("="*50 + "\n")
 
 # -----------------------------------------------------------------------------
 # Модель запроса
@@ -120,31 +97,14 @@ class CutRequest(BaseModel):
 # CAD Core (CadQuery)
 # -----------------------------------------------------------------------------
 def load_primitive(shape: str) -> cq.Workplane:
-    """Загружает STEP примитив с кэшированием"""
-    global _PRIMITIVES_CACHE
-    
-    # Возвращаем из кэша, если уже загружено
-    if shape in _PRIMITIVES_CACHE:
-        print(f"Using cached primitive: {shape}")
-        # Возвращаем КОПИЮ, чтобы избежать мутации оригинала
-        return _PRIMITIVES_CACHE[shape].copy()
-    
     path = PRIMITIVES_DIR / f"{shape}.step"
     if not path.exists():
         raise RuntimeError(f"Primitive not found: {path}")
-    
     shape_obj = cq.importers.importStep(str(path))
     if hasattr(shape_obj, 'val'):
-        result = shape_obj
+        return shape_obj
     else:
-        result = cq.Workplane().add(shape_obj)
-    
-    # Сохраняем в кэш
-    _PRIMITIVES_CACHE[shape] = result
-    print(f"Loaded and cached primitive: {shape}")
-    
-    # Возвращаем копию
-    return result.copy()
+        return cq.Workplane().add(shape_obj)
 
 def align_primitive(shape: cq.Workplane, shape_type: str) -> cq.Workplane:
     bb = shape.val().BoundingBox()
@@ -484,3 +444,4 @@ if __name__ == "__main__":
     print("Engineering CAD Cut Service v3.2 (SVG always, DXF optional)")
     print("="*60)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+

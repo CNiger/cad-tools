@@ -742,7 +742,7 @@
         document.getElementById('loadingOverlay').style.display = 'flex';
         updateStatus('Генерация 3D модели...');
         try {
-            const response = await fetch('/api/create-model', {
+            const response = await fetch('/cut/api/create-model', {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ shape: currentShape, points: currentPoints })

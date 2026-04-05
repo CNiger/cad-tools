@@ -1,4 +1,4 @@
-rom fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from main import app as cut_app   # <- импорт есть

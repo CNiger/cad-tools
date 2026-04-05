@@ -1,16 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
-from main import app as cut_app   # <- импорт есть
+from main import app as cut_app   # монтируем cut_app
 import uvicorn
 from pathlib import Path
 
 app = FastAPI(title="CAD Tools Suite")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# URL сервиса вырезания (запускается на порту 8001 внутри контейнера)
-CUT_SERVICE_URL = "http://localhost:8001"
-
-# Главная страница — только работающие инструменты
 HTML_INDEX = '''<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -91,30 +93,10 @@ async def root():
 
 @app.get("/epure", response_class=HTMLResponse)
 async def epure_mode():
-    """Отдаёт фронтенд эпюра Монжа"""
     return FileResponse("alp.html")
 
-# Проксирование всех запросов /cut/* на внутренний сервис
-@app.api_route("/cut/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def cut_proxy(request: Request, path: str):
-    async with httpx.AsyncClient() as client:
-        url = f"{CUT_SERVICE_URL}/{path}"
-        body = await request.body()
-        # Проксируем заголовки, исключая host
-        headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
-        resp = await client.request(
-            method=request.method,
-            url=url,
-            headers=headers,
-            content=body,
-            params=request.query_params
-        )
-        return Response(
-            content=resp.content,
-            status_code=resp.status_code,
-            headers=dict(resp.headers)
-        )
+# Монтируем CAD Cut Service на /cut
+app.mount("/cut", cut_app)
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("app:app", host="0.0.0.0", port=8000)

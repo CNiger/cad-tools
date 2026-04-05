@@ -1,10 +1,9 @@
-"""
-CAD Tools Suite — маршрутизатор с проксированием на CAD Cut Service.
-"""
-
-from fastapi import FastAPI, Request, Response
-from fastapi.responses import HTMLResponse, FileResponse
-import httpx
+rom fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
+from main import app as cut_app   # <- импорт есть
+import uvicorn
+from pathlib import Path
 
 app = FastAPI(title="CAD Tools Suite")
 

@@ -1,7 +1,7 @@
 """
 Engineering CAD Cut Service
-Полная версия с HLR через pythonOCC (без fallback).
-Генерирует STEP, STL, SVG и DXF (чертёж с видимыми/невидимыми линиями).
+Полная версия с HLR через pythonOCC (с fallback на SVG).
+Всегда генерирует SVG для трёх видов.
 Размеры: сфера R30, цилиндр/конус R30 x H70.
 """
 
@@ -10,27 +10,32 @@ import traceback
 from pathlib import Path
 from typing import List, Tuple
 
-import os 
-
 import cadquery as cq
 import ezdxf
 from ezdxf.math import Vec2
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, validator
 
-# Обязательные импорты pythonOCC (без fallback)
-from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCC.Core.HLRAlgo import HLRAlgo_Projector
-from OCC.Core.TopoDS import TopoDS_Shape
-from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax1, gp_Trsf
-from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
-from OCC.Core.TopExp import TopExp_Explorer
-from OCC.Core.TopAbs import TopAbs_EDGE
-from OCC.Core.BRep import BRep_Tool
-from OCC.Core.GCPnts import GCPnts_AbscissaPoint
-from OCC.Core.GeomAdaptor import GeomAdaptor_Curve
+# Импорты для HLR
+try:
+    from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+    from OCC.Core.HLRAlgo import HLRAlgo_Projector
+    from OCC.Core.TopoDS import TopoDS_Shape 
+    from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax1, gp_Trsf
+    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+    from OCC.Core.TopExp import TopExp_Explorer
+    from OCC.Core.TopAbs import TopAbs_EDGE
+    from OCC.Core.BRep import BRep_Tool
+    from OCC.Core.GCPnts import GCPnts_AbscissaPoint
+    from OCC.Core.GeomAdaptor import GeomAdaptor_Curve
+    from OCC.Core.Geom import Geom_Curve
+    OCC_AVAILABLE = True
+except ImportError:
+    OCC_AVAILABLE = False
+    print("WARNING: pythonOCC not installed. HLR will use SVG fallback.")
 
 # -----------------------------------------------------------------------------
 # Конфигурация
@@ -45,8 +50,21 @@ STATIC_DIR.mkdir(exist_ok=True)
 
 REQUIRED_PRIMITIVES = ["sphere.step", "cylinder.step", "cone.step"]
 missing = [f for f in REQUIRED_PRIMITIVES if not (PRIMITIVES_DIR / f).exists()]
-#cif missing:
- #    raise RuntimeError(f"Missing primitive STEP files: {missing}")
+if missing:
+    print("WARNING: Missing primitive files:", missing)
+    print("Will try to create them at runtime...")
+    PRIMITIVES_DIR.mkdir(exist_ok=True)
+    from cadquery import Workplane
+    primitive_map = {
+        "sphere.step": Workplane("XY").sphere(30),
+        "cylinder.step": Workplane("XY").cylinder(70, 30),
+        "cone.step": Workplane("XY").cone(70, 30, 0)
+    }
+    for name, obj in primitive_map.items():
+        path = PRIMITIVES_DIR / name
+        if not path.exists():
+            cq.exporters.export(obj, str(path))
+            print(f"Generated {path}")
 
 SUPPORTED_SHAPES = {"sphere", "cylinder", "cone"}
 CUTTER_DEPTH = 200.0
@@ -56,21 +74,6 @@ PRIMITIVE_CONFIG = {
     "cylinder": {"radius": 30.0, "height": 70.0},
     "cone": {"radius": 30.0, "height": 70.0}
 }
-# Диагностика примитивов
-print("=== DIAGNOSTICS ===")
-print("Current working directory:", os.getcwd())
-print("BASE_DIR:", BASE_DIR)
-PRIMITIVES_DIR = BASE_DIR / "primitives"
-print("PRIMITIVES_DIR:", PRIMITIVES_DIR)
-print("Exists:", PRIMITIVES_DIR.exists())
-if PRIMITIVES_DIR.exists():
-    print("Files in primitives:", list(PRIMITIVES_DIR.glob("*")))
-else:
-    print("Primitives directory NOT found")
-    # Попробуем поискать в других местах
-    for root, dirs, files in os.walk("."):
-        if "primitives" in dirs:
-            print(f"Found primitives at: {os.path.join(root, 'primitives')}")
 
 # -----------------------------------------------------------------------------
 # FastAPI
@@ -84,7 +87,7 @@ app.add_middleware(
 )
 
 # -----------------------------------------------------------------------------
-# Pydantic модель
+# Модель запроса
 # -----------------------------------------------------------------------------
 class CutRequest(BaseModel):
     shape: str
@@ -188,29 +191,27 @@ def perform_cut(shape: cq.Workplane, cutter: cq.Workplane) -> cq.Workplane:
 # SVG генерация (всегда)
 # -----------------------------------------------------------------------------
 def make_3view_svg(shape: cq.Workplane, base_name: str) -> dict:
-    svg_opts = {
-        "width": 400,
-        "height": 400,
-        "marginLeft": 20,
-        "marginTop": 20,
-        "strokeWidth": 0.5,
-        "strokeColor": (255, 140, 0),
-        "hiddenColor": (173, 216, 230),
-        "showHidden": True,
-        "showAxes": False
-    }
-
     views = {}
     for view, dir in [("front", (0,-1,0)), ("top", (0,0,-1)), ("left", (-1,0,0))]:
-        svg_opts["projectionDir"] = dir
+        svg_opts = {
+            "width": 400,
+            "height": 400,
+            "marginLeft": 20,
+            "marginTop": 20,
+            "strokeWidth": 0.5,
+            "strokeColor": (255, 140, 0),
+            "hiddenColor": (173, 216, 230),
+            "showHidden": True,
+            "showAxes": False,
+            "projectionDir": dir
+        }
         path = TEMP_DIR / f"{base_name}_{view}.svg"
         cq.exporters.export(shape, str(path), opt=svg_opts)
         views[view] = str(path)
-
     return views
 
 # -----------------------------------------------------------------------------
-# HLR через pythonOCC (обязателен)
+# HLR через pythonOCC (исправленный)
 # -----------------------------------------------------------------------------
 def get_occ_shape(cq_shape: cq.Workplane) -> TopoDS_Shape:
     return cq_shape.val().wrapped
@@ -293,14 +294,9 @@ def make_3view_drawing_hlr(occ_shape: TopoDS_Shape, base_name: str) -> Path:
             if len(points) >= 2:
                 msp.add_lwpolyline(points, close=False, dxfattribs={"layer": "Hidden"})
 
-    # вид сверху
     add_projection(occ_shape, 0, gap)
-
-    # вид спереди
     front = rotate_shape(occ_shape, (1, 0, 0), -90)
     add_projection(front, 0, 0)
-
-    # вид слева
     left = rotate_shape(occ_shape, (0, 1, 0), 90)
     add_projection(left, gap, 0)
 
@@ -312,12 +308,9 @@ def make_3view_drawing_hlr(occ_shape: TopoDS_Shape, base_name: str) -> Path:
 # API Endpoints
 # -----------------------------------------------------------------------------
 @app.post("/api/create-model")
-async def create_model(req: CutRequest):
+def create_model(req: CutRequest):
     try:
         print(f"\n🔧 Processing {req.shape} with {len(req.points)} points")
-        import sys
-        print("=== CREATE MODEL CALLED ===", file=sys.stderr)
-        print(f"Shape: {req.shape}, Points: {req.points}", file=sys.stderr)
 
         base = load_primitive(req.shape)
         base = align_primitive(base, req.shape)
@@ -332,20 +325,21 @@ async def create_model(req: CutRequest):
         file_id = uuid.uuid4().hex[:8]
         base_name = f"{req.shape}_cut_{file_id}"
 
-        # STEP
         step_path = TEMP_DIR / f"{base_name}.step"
         cq.exporters.export(result, str(step_path))
 
-        # STL
         stl_path = TEMP_DIR / f"{base_name}.stl"
         cq.exporters.export(result, str(stl_path), tolerance=0.01, angularTolerance=0.1)
 
-        # SVG
         svg_files = make_3view_svg(result, base_name)
 
-        # DXF через HLR (обязателен)
-        occ_shape = get_occ_shape(result)
-        dxf_path = make_3view_drawing_hlr(occ_shape, base_name)
+        dxf_path = None
+        if OCC_AVAILABLE:
+            try:
+                occ_shape = get_occ_shape(result)
+                dxf_path = make_3view_drawing_hlr(occ_shape, base_name)
+            except Exception as e:
+                print(f"HLR failed, DXF not generated: {e}")
 
         response = {
             "success": True,
@@ -361,33 +355,40 @@ async def create_model(req: CutRequest):
             "downloads": {
                 "step": {
                     "filename": f"{base_name}.step",
-                    "url": f"/cut/api/download/step/{base_name}.step",   # <- добавил /cut
+                    "url": f"/api/download/step/{base_name}.step",
                     "size": step_path.stat().st_size
                 },
                 "stl": {
                     "filename": f"{base_name}.stl",
-                    "url": f"/cut/api/download/stl/{base_name}.stl",    # <- добавил /cut
+                    "url": f"/api/download/stl/{base_name}.stl",
                     "size": stl_path.stat().st_size
                 },
                 "svg": {
                     "front": {
                         "filename": f"{base_name}_front.svg",
-                        "url": f"/cut/api/download/svg/{base_name}_front.svg",  # <- добавил /cut
+                        "url": f"/api/download/svg/{base_name}_front.svg",
                         "size": Path(svg_files["front"]).stat().st_size
                     },
                     "top": {
                         "filename": f"{base_name}_top.svg",
-                        "url": f"/cut/api/download/svg/{base_name}_top.svg",    # <- добавил /cut
+                        "url": f"/api/download/svg/{base_name}_top.svg",
                         "size": Path(svg_files["top"]).stat().st_size
                     },
                     "left": {
                         "filename": f"{base_name}_left.svg",
-                        "url": f"/cut/api/download/svg/{base_name}_left.svg",   # <- добавил /cut
+                        "url": f"/api/download/svg/{base_name}_left.svg",
                         "size": Path(svg_files["left"]).stat().st_size
                     }
                 }
             }
         }
+
+        if dxf_path:
+            response["downloads"]["dxf"] = {
+                "filename": f"{base_name}_drawing.dxf",
+                "url": f"/api/download/dxf/{base_name}_drawing.dxf",
+                "size": dxf_path.stat().st_size
+            }
 
         return response
 
@@ -433,20 +434,19 @@ def health():
     return {
         "status": "ok",
         "cadquery": cq.__version__,
-        "pythonocc": True,  # всегда true, так как импорт обязателен
+        "pythonocc": OCC_AVAILABLE,
         "primitives": primitives,
         "temp_files": len(list(TEMP_DIR.glob("*")))
     }
 
 # -----------------------------------------------------------------------------
-# Статика (фронтенд для cut-сервиса, если нужен)
+# Статика
 # -----------------------------------------------------------------------------
-from fastapi.staticfiles import StaticFiles
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
     print("\n" + "="*60)
-    print("Engineering CAD Cut Service v3.2 (HLR required)")
+    print("Engineering CAD Cut Service v3.2 (SVG always, DXF optional)")
     print("="*60)
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=False, log_level="info")
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

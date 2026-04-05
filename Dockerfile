@@ -18,8 +18,11 @@ SHELL ["conda", "run", "-n", "cadenv", "/bin/bash", "-c"]
 WORKDIR /app
 COPY . .
 
-RUN pip install httpx
+RUN pip install httpx   # не обязательно, но пусть будет
 RUN mkdir -p primitives temp static
+
+# Проверка примитивов (они создадутся в рантайме, но можно и проверить)
+# Если хочешь, можешь закомментировать или оставить как предупреждение
 
 EXPOSE 8000
 

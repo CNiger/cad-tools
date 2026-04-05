@@ -192,7 +192,7 @@ def perform_cut(shape: cq.Workplane, cutter: cq.Workplane) -> cq.Workplane:
 # -----------------------------------------------------------------------------
 def make_3view_svg(shape: cq.Workplane, base_name: str) -> dict:
     views = {}
-    for view, dir in [("front", (0,-1,0)), ("top", (0,0,-1)), ("left", (-1,0,0))]:
+    for view, dir in [("front", (0,-1,0)), ("top", (0,0,1)), ("left", (-1,0,0))]:
         svg_opts = {
             "width": 400,
             "height": 400,

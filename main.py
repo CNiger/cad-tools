@@ -355,28 +355,28 @@ def create_model(req: CutRequest):
             "downloads": {
                 "step": {
                     "filename": f"{base_name}.step",
-                    "url": f"/api/download/step/{base_name}.step",
+                    "url": f"/cut/api/download/step/{base_name}.step",
                     "size": step_path.stat().st_size
                 },
                 "stl": {
                     "filename": f"{base_name}.stl",
-                    "url": f"/api/download/stl/{base_name}.stl",
+                    "url": f"/cut/api/download/step/{base_name}.stl",
                     "size": stl_path.stat().st_size
                 },
                 "svg": {
                     "front": {
                         "filename": f"{base_name}_front.svg",
-                        "url": f"/api/download/svg/{base_name}_front.svg",
+                        "url": f"/cut/api/download/step/{base_name}_front.svg",
                         "size": Path(svg_files["front"]).stat().st_size
                     },
                     "top": {
                         "filename": f"{base_name}_top.svg",
-                        "url": f"/api/download/svg/{base_name}_top.svg",
+                        "url": f"/cut/api/download/step/{base_name}_top.svg",
                         "size": Path(svg_files["top"]).stat().st_size
                     },
                     "left": {
                         "filename": f"{base_name}_left.svg",
-                        "url": f"/api/download/svg/{base_name}_left.svg",
+                        "url": f"/cut/api/download/step/{base_name}_left.svg",
                         "size": Path(svg_files["left"]).stat().st_size
                     }
                 }
@@ -386,7 +386,7 @@ def create_model(req: CutRequest):
         if dxf_path:
             response["downloads"]["dxf"] = {
                 "filename": f"{base_name}_drawing.dxf",
-                "url": f"/api/download/dxf/{base_name}_drawing.dxf",
+                "url": f"/cut/api/download/step/{base_name}_drawing.dxf",
                 "size": dxf_path.stat().st_size
             }
 

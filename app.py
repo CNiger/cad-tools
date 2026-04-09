@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
-from main import app as cut_app   # монтируем cut_app
+from main import app as cut_app   
 import uvicorn
 from pathlib import Path
 
@@ -80,6 +80,11 @@ HTML_INDEX = '''<!DOCTYPE html>
                 <div class="tool-title">Эпюр Монжа</div>
                 <div class="tool-desc">Трёхпроекционное черчение. Линии, прямоугольники, эллипсы.</div>
             </a>
+            <a href="/ask" class="tool-card">
+                <div class="tool-icon">📐</div>
+                <div class="tool-title">Аксонометрия</div>
+                <div class="tool-desc">Построение отрезков в косоугольной проекции. Координаты X Y Z.</div>
+            </a>
         </div>
         <footer>CAD Tools Suite | injgaf.ru</footer>
     </div>
@@ -95,7 +100,10 @@ async def root():
 async def epure_mode():
     return FileResponse("alp.html")
 
-# Монтируем CAD Cut Service на /cut
+@app.get("/ask", response_class=HTMLResponse)
+async def axonometry_mode():
+    return FileResponse("aks.html")
+
 app.mount("/cut", cut_app)
 
 if __name__ == "__main__":

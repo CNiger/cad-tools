@@ -19,6 +19,7 @@ HTML_INDEX = '''<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CAD Tools Suite</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -91,7 +92,7 @@ HTML_INDEX = '''<!DOCTYPE html>
 </body>
 </html>
 '''
-# Добавьте в app.py новый маршрут
+
 @app.get("/step-viewer", response_class=HTMLResponse)
 async def step_viewer():
     return HTMLResponse('''
@@ -101,6 +102,7 @@ async def step_viewer():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>STEP 3D Viewer</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <style>
         body { margin: 0; overflow: hidden; font-family: monospace; }
         #info {
@@ -349,6 +351,11 @@ async def epure_mode():
 @app.get("/ask", response_class=HTMLResponse)
 async def axonometry_mode():
     return FileResponse("aks.html")
+
+# Добавь этот эндпоинт для отдачи фавикона
+@app.get("/favicon.ico", include_in_schema=False)
+async def get_favicon():
+    return FileResponse("favicon.ico")
 
 app.mount("/cut", cut_app)
 

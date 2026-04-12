@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Индустриальный эпюр · Ортогональный режим</title>
+    <title>Вырез</title>
     <style>
         /* ----- ИНДУСТРИАЛЬНЫЙ ФУТУРИЗМ ----- */
         :root {
@@ -442,7 +442,7 @@
 </div>
 
 <div class="telemetry-panel" id="telemetry">
-    <div><span class="telemetry-prefix">[SYS]</span> <span id="telemetryMsg" class="telemetry-message">АКТИВНА СИСТЕМА ПРОФИЛИРОВАНИЯ</span></div>
+    <div><span class="telemetry-prefix">[SYS]</span> <span id="telemetryMsg" class="telemetry-message"></span></div>
 </div>
 
 <div id="loadingOverlay" class="loading">
@@ -849,7 +849,7 @@
         orthoToggle.addEventListener('click', toggleOrtho);
         selectShape('cone');
         setFormat('step');
-        updateStatus('Система готова. ORTHO — строгая горизонталь/вертикаль');
+        updateStatus('ORTHO — строгая горизонталь/вертикаль');
     }
     init();
 </script>
